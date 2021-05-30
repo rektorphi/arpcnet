@@ -271,7 +271,7 @@ func TestRemoveQueriedRoute(t *testing.T) {
 		t.Fatalf("Handler should be removed from router: %v\n", id)
 	}
 
-	tctx, tcan := context.WithTimeout(ctx, 50*time.Millisecond)
+	tctx, tcan := context.WithTimeout(ctx, 100*time.Millisecond)
 	ccall, chandler = NewClientCall(10, "", tctx, core1.MemMan())
 	err = core1.StartRPC(tctx, name, []string{}, make(map[string][]byte), chandler)
 	if err == nil {
