@@ -264,7 +264,7 @@ func TestRemoveQueriedRoute(t *testing.T) {
 	// take the route offline
 	core2.Router().DestinationOffline(name, r)
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	_, id, _ = core1.Router().GetNearest(name)
 	if id != nil {

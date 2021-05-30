@@ -184,6 +184,8 @@ func TestRouteHandlerGoingOffline(t *testing.T) {
 	cancelCtx2()
 	// Lets run the call
 	err := ccall.UnaryClientCall1()
+
+	time.Sleep(100 * time.Millisecond)
 	// The call must fail gracefully and get cleaned up
 	rpcs := rpcm1.GetRPCs()
 	if len(rpcs) != 0 {
