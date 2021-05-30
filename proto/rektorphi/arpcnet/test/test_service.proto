@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package rektorphi.arpcnet.test;
+option java_package = "com.github.rektorphi.arpcnet.test";
+option go_package = "github.com/rektorphi/arpcnet/test";
+
+message TestMessage {
+    string text = 1;
+    bytes data = 2;    
+}
+
+service Test {
+    rpc UnaryCall(TestMessage) returns (TestMessage);
+    rpc ServerStream(TestMessage) returns (stream TestMessage);
+    rpc BidiStream(stream TestMessage) returns (stream TestMessage);
+}

@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+package rektorphi.arpcnet.v1;
+option java_package = "com.github.rektorphi.arpcnet.v1";
+option go_package = "github.com/rektorphi/arpcnet/v1";
+
+message RPCFrame {
+    fixed64 id = 1;
+    oneof type {
+        UpStart up_start = 2;
+        UpData up_data = 3;
+        UpClose up_close = 4;
+        UpCancel up_cancel = 5;
+        DownResponse down_resp = 8;
+        DownData down_data = 9;
+        DownFinish down_finish = 10;
+    }
+}
+
+message MD {
+    repeated string kv_pairs = 1;
+}
+
+message UpStart {
+    bytes source_id = 1;
+    bytes destination_id = 2;
+    MD metadata = 3;
+    map<string, bytes> properties = 4;
+}
+
+message UpData {
+    bytes chunk = 1;
+    uint32 remaining = 2;
+}
+
+message UpClose {
+}
+
+message UpCancel {
+    string message = 2;
+}
+
+message DownResponse {
+    MD metadata = 1;
+}
+
+message DownData {
+    bytes chunk = 1;
+    uint32 remaining = 2;
+}
+
+message DownFinish {
+    uint32 status = 1;
+    string message = 2;
+    MD metadata = 3;
+}

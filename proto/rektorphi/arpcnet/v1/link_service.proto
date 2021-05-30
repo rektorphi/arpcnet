@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+package rektorphi.arpcnet.v1;
+option java_package = "com.github.rektorphi.arpcnet.v1";
+option go_package = "github.com/rektorphi/arpcnet/v1";
+
+import "rektorphi/arpcnet/v1/rpcframe.proto";
+
+service LinkService {
+    rpc Link(stream LinkFrame) returns (stream LinkFrame);
+}
+
+message LinkFrame {
+    oneof type {
+        RPCFrame rpc_frame = 1;
+        Query query = 2;
+        Announce announce = 3;
+    }
+}
+
+message Query {
+    uint64 id = 1;
+    bytes name = 2;
+    // How long this query is valid in Unix seconds. 
+    // Receivers of this message can choose a shorter deadline.
+    uint64 deadline_unix_ms = 3;
+}
+
+message Announce {
+    uint64 id = 1;
+    bytes name = 2;
+    Metric value = 3;
+    uint64 deadline_unix_ms = 4;
+}
+
+message Metric {
+    int32 hops = 1;
+}
