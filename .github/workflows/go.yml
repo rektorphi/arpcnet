@@ -19,6 +19,8 @@ jobs:
         go-version: 1.15
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
+    - name: Install Protoc-gen-go
+      run: go install google.golang.org/protobuf/cmd/protoc-gen-go      
       
     - name: Generate
       run: go generate -v
