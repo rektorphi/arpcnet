@@ -149,7 +149,7 @@ func TestQueryAnnounce(t *testing.T) {
 	}
 	tcan()
 	// Core2 has it
-	tcx, tcan = context.WithTimeout(ctx, 50*time.Millisecond)
+	tcx, tcan = context.WithTimeout(ctx, 100*time.Millisecond)
 	_, h, err := core2.QueryRoute(tcx, name, true)
 	if h == nil || err != nil {
 		t.Fatalf("unexpected error %s", err.Error())
@@ -161,7 +161,7 @@ func TestQueryAnnounce(t *testing.T) {
 	core2.Router().Add(l21)
 
 	// now the query should work
-	tcx, tcan = context.WithTimeout(ctx, 50*time.Millisecond)
+	tcx, tcan = context.WithTimeout(ctx, 100*time.Millisecond)
 	_, h, err = core1.QueryRoute(tcx, name, true)
 	if h == nil || err != nil {
 		t.Fatalf("unexpected error %s", err.Error())
