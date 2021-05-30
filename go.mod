@@ -1,6 +1,6 @@
 module github.com/rektorphi/arpcnet
 
-go 1.15
+go 1.16
 
 require (
 	code.cloudfoundry.org/bytefmt v0.0.0-20210524144015-27119551aaea

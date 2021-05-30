@@ -149,7 +149,7 @@ func TestQueryAnnounce(t *testing.T) {
 	}
 	tcan()
 	// Core2 has it
-	tcx, tcan = context.WithTimeout(ctx, 50*time.Millisecond)
+	tcx, tcan = context.WithTimeout(ctx, 100*time.Millisecond)
 	_, h, err := core2.QueryRoute(tcx, name, true)
 	if h == nil || err != nil {
 		t.Fatalf("unexpected error %s", err.Error())
@@ -161,7 +161,7 @@ func TestQueryAnnounce(t *testing.T) {
 	core2.Router().Add(l21)
 
 	// now the query should work
-	tcx, tcan = context.WithTimeout(ctx, 50*time.Millisecond)
+	tcx, tcan = context.WithTimeout(ctx, 100*time.Millisecond)
 	_, h, err = core1.QueryRoute(tcx, name, true)
 	if h == nil || err != nil {
 		t.Fatalf("unexpected error %s", err.Error())
@@ -232,7 +232,8 @@ func TestQueryTimeout(t *testing.T) {
 
 // A route that was found by query must be removed if the target does not have the name online anymore.
 func TestRemoveQueriedRoute(t *testing.T) {
-	//log.SetFormatter(&simpleFormatter{time.Now()})
+	LogLevel = LDetail
+	log.Default().SetFlags(log.Lmicroseconds)
 
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer ctxCancel()
@@ -264,14 +265,14 @@ func TestRemoveQueriedRoute(t *testing.T) {
 	// take the route offline
 	core2.Router().DestinationOffline(name, r)
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	_, id, _ = core1.Router().GetNearest(name)
 	if id != nil {
 		t.Fatalf("Handler should be removed from router: %v\n", id)
 	}
 
-	tctx, tcan := context.WithTimeout(ctx, 50*time.Millisecond)
+	tctx, tcan := context.WithTimeout(ctx, 100*time.Millisecond)
 	ccall, chandler = NewClientCall(10, "", tctx, core1.MemMan())
 	err = core1.StartRPC(tctx, name, []string{}, make(map[string][]byte), chandler)
 	if err == nil {
