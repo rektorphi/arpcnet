@@ -232,7 +232,8 @@ func TestQueryTimeout(t *testing.T) {
 
 // A route that was found by query must be removed if the target does not have the name online anymore.
 func TestRemoveQueriedRoute(t *testing.T) {
-	//log.SetFormatter(&simpleFormatter{time.Now()})
+	LogLevel = LDetail
+	log.Default().SetFlags(log.Lmicroseconds)
 
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer ctxCancel()
