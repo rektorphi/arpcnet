@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"testing"
 	"time"
 
@@ -265,7 +266,7 @@ func TestRemoveQueriedRoute(t *testing.T) {
 	// take the route offline
 	core2.Router().DestinationOffline(name, r)
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	_, id, _ = core1.Router().GetNearest(name)
 	if id != nil {
@@ -275,14 +276,16 @@ func TestRemoveQueriedRoute(t *testing.T) {
 	tctx, tcan := context.WithTimeout(ctx, 100*time.Millisecond)
 	ccall, chandler = NewClientCall(10, "", tctx, core1.MemMan())
 	err = core1.StartRPC(tctx, name, []string{}, make(map[string][]byte), chandler)
-	if err == nil {
+	if re, ok := err.(RoutingError); !ok || !strings.Contains(re.Cause.Error(), "deadline exceeded") {
 		t.Fatalf("Call should have failed with timeout: %v\n", err)
 	}
-	tcan()
 	err = ccall.UnaryClientCall1()
 	if err == nil {
 		t.Fatalf("Call should finish with error: %v\n", err)
 	}
+	tcan()
+
+	time.Sleep(50 * time.Millisecond)
 
 	// take the route online again
 	core2.Router().DestinationUpdate(name, r, Metric{10})

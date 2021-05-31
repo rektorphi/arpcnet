@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -35,9 +34,9 @@ func main() {
 	var cfgFile = flag.String("cfg", "", "Configuration file")
 	var verbose = flag.Bool("v", false, "Verbose logging")
 	var group = flag.String("g", "default-group", "Arpcnet group of the node")
-	var serverPort = flag.Int("gp", 13075, "Port for gRPC gateway server")
+	var serverPort = flag.Int("gp", 8028, "Port for gRPC gateway server")
 	var link = flag.String("l", "", "Address of a server node to link to")
-	var linkPort = flag.Int("lp", 0, "Port for incomming links from other nodes")
+	var linkPort = flag.Int("lp", 8029, "Port for incomming links from other nodes")
 	var mounts mountFlags
 	flag.Var(&mounts, "mg", "Map a gRPC server into the arpc network <host:port>=<arpc:name>")
 	flag.Parse()
@@ -53,7 +52,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("ArpcNet version %s\n", arpcnet.Version)
+	log.Printf("ArpcNet version %s\n", arpcnet.Version)
 	var cfg *arpcnet.Config
 	if len(*cfgFile) == 0 {
 		cfg = &arpcnet.Config{GRPCPort: *serverPort, CoreMemory: "", Group: *group}
@@ -80,7 +79,13 @@ func main() {
 		}
 	}
 
-	log.Printf("Starting gRPC gateway on port %d", cfg.GRPCPort)
+	log.Printf("Opening gRPC gateway on port %d", cfg.GRPCPort)
+	for _, ccfg := range cfg.LinkClients {
+		log.Printf("Opening link to %s", ccfg.Target)
+	}
+	for _, scfg := range cfg.LinkServers {
+		log.Printf("Opening link server on port %d", scfg.Port)
+	}
 
 	node, err := arpcnet.NewNode(cfg)
 	if err != nil {

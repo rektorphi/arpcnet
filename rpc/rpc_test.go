@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
@@ -10,13 +11,13 @@ import (
 func UnaryServerCall1(scall *ServerCall) {
 	data, err := scall.Receive()
 	if err != nil {
-		fmt.Printf("Data from client expected but got error %v\n", err)
+		log.Printf("Data from client expected but got error %v\n", err)
 		scall.Finish()
 	}
 	scall.Send(data)
 	_, err = scall.Receive()
 	if _, ok := err.(HalfCloseError); !ok {
-		fmt.Printf("HalfClose expected but got %v\n", err)
+		log.Printf("HalfClose expected but got %v\n", err)
 	}
 	scall.Finish()
 }
@@ -28,15 +29,15 @@ func (ccall *ClientCall) UnaryClientCall1() error {
 	rdata, err := ccall.Receive()
 	if err != nil {
 		ccall.Cancel("cancel")
-		fmt.Printf("Data from server expected but got error: %v\n", err)
+		log.Printf("Data from server expected but got error: %v\n", err)
 		return err
 	}
 	if len(rdata) != len(data) {
-		fmt.Printf("Data response has not the expected length\n")
+		log.Printf("Data response has not the expected length\n")
 	}
 	_, err = ccall.Receive()
 	if _, ok := err.(FinishError); !ok {
-		fmt.Printf("Data finish expected but not received\n")
+		log.Printf("Data finish expected but not received\n")
 		ccall.Cancel("cancel")
 		return err
 	}
