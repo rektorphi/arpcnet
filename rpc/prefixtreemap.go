@@ -43,7 +43,7 @@ func (ptm PrefixTreeMap) GetChildren(key *Address) (children []PrefixMapEntry) {
 	return children
 }
 
-// GetSubtree returns all keys with values of the subtree inlcuding the given key, or nil if the key is not part of the tree.
+// GetSubtree returns all keys with values of the subtree including the given key, or nil if the key is not part of the tree.
 func (ptm PrefixTreeMap) GetSubtree(key *Address) (entries []PrefixMapEntry) {
 	entries = make([]PrefixMapEntry, 0)
 	ptm.IterateSubtree(key, func(e PrefixMapEntry) bool {
@@ -55,7 +55,7 @@ func (ptm PrefixTreeMap) GetSubtree(key *Address) (entries []PrefixMapEntry) {
 	return entries
 }
 
-// RemoveSubtree removes the subtree inlcuding the given key and returns the removed entries, or nil if the key is not part of the tree.
+// RemoveSubtree removes the subtree including the given key and returns the removed entries, or nil if the key is not part of the tree.
 func (ptm PrefixTreeMap) RemoveSubtree(key *Address) (entries []PrefixMapEntry) {
 	entries = make([]PrefixMapEntry, 0)
 	d, n := ptm.getNearest(0, key)
