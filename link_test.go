@@ -18,14 +18,14 @@ func TestLink(t *testing.T) {
 	}
 	defer listen.Close()
 	ls := NewLinkServer(listen, core)
-	ls.Start()
+	go ls.Run()
 
 	conn, err := grpc.Dial("localhost:28972", grpc.WithInsecure())
 	if err != nil {
 		t.Fatalf("dial failed %v", err)
 	}
 	lc := NewLinkClient(conn, core)
-	lc.Start()
+	go lc.Run()
 	time.Sleep(50 * time.Millisecond)
 
 	if len(core.Router().GetAll()) != 2 {

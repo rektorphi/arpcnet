@@ -18,7 +18,7 @@ type MemoryTicket interface {
 }
 
 // A MemoryManager helps track and limit memory consumption of certain processes.
-// It guards an amount of memory. To use some of this memory, a ticket must be aquired and released later to free the memory for other users.
+// It guards an amount of memory. To use some of this memory, a ticket must be acquired and released later to free the memory for other users.
 type MemoryManager interface {
 	// The total memory managed by this instance.
 	Max() int

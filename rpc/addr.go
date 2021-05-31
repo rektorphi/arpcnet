@@ -133,7 +133,7 @@ func (s iblSliceHeader) slice(from, to int) iblSliceHeader {
 
 // Address is an immutable data structure of a sequence of segment, like parts in a filesystem path.
 // Modifications are cheap operations without any copies by modifying and chaining slice headers. However some operations trigger
-// compactification of all slices into a single continous string which can be used for serialization or as a comparable map key.
+// compactification of all slices into a single continuous string which can be used for serialization or as a comparable map key.
 // The compactification does not change the represented address but is a costly copy so addresses should generally be passed around as pointer so this step is done only once.
 // Since an address is immutable, a once compacted address never becomes uncompact again.
 type Address struct {
@@ -273,7 +273,7 @@ func (a *Address) Compact() *IBList {
 	return a.compactIBL
 }
 
-// String returns a string of the contents of this address with an arbitrary seperation character.
+// String returns a string of the contents of this address with an arbitrary separation character.
 // Note that the address may not be a legal UTF-8 string and can contain arbitrary byte sequences.
 // This operation compacts the address and once compacted, it is quick without further copies or string construction.
 func (a *Address) String() string {

@@ -73,48 +73,51 @@ func (rmap *RouteMap) Route(dest *Address) Identifiable {
 
 func (rmap *RouteMap) GetNearest(dest *Address) (int, Identifiable, Metric) {
 	rmap.rwm.RLock()
-	defer rmap.rwm.RUnlock()
 	d, n := rmap.destToRouteMap.GetNearest(dest)
 	if n == nil {
+		rmap.rwm.RUnlock()
 		return -1, nil, Metric{}
 	}
 	var rheap *routeHeap = n.(*routeHeap)
 	id, metric := rheap.peek()
+	rmap.rwm.RUnlock()
 	return d, id, metric
 }
 
 func (rmap *RouteMap) Get(id uint64) Identifiable {
 	rmap.rwm.RLock()
-	defer rmap.rwm.RUnlock()
 	rd, ok := rmap.routeToDestMap[id]
 	if ok {
+		rmap.rwm.RUnlock()
 		return rd.route
 	}
+	rmap.rwm.RUnlock()
 	return nil
 }
 
 func (rmap *RouteMap) GetAll() (res []Identifiable) {
 	rmap.rwm.RLock()
-	defer rmap.rwm.RUnlock()
 	res = make([]Identifiable, len(rmap.routeToDestMap))
 	i := 0
 	for _, rd := range rmap.routeToDestMap {
 		res[i] = rd.route
 		i++
 	}
+	rmap.rwm.RUnlock()
 	return
 }
 
 // Add puts a route in the list of available routes. Initially no destinations are reachable via this route.
 func (rmap *RouteMap) Add(r Identifiable) error {
 	rmap.rwm.Lock()
-	defer rmap.rwm.Unlock()
-	rd, ok := rmap.routeToDestMap[r.ID()]
+	_, ok := rmap.routeToDestMap[r.ID()]
 	if ok {
+		rmap.rwm.Unlock()
 		return fmt.Errorf("a route with id %d already exists", r.ID())
 	}
-	rd = routeDestinations{r, make(map[string]heapItemHandle)}
+	rd := routeDestinations{r, make(map[string]heapItemHandle)}
 	rmap.routeToDestMap[r.ID()] = rd
+	rmap.rwm.Unlock()
 	return nil
 }
 

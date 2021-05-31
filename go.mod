@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	code.cloudfoundry.org/bytefmt v0.0.0-20210524144015-27119551aaea
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/montanaflynn/stats v0.6.6
 	github.com/stretchr/testify v1.7.0

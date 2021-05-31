@@ -91,6 +91,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	log.Printf("Started node %s", node.CoreID().String())
+	log.Printf("Started node %s", node.ID().String())
 	node.Run()
 }

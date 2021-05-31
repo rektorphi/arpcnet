@@ -179,7 +179,7 @@ func assembleChunk(bufp *[]byte, chunk *Chunk) ([]byte, error) {
 		if chunk.Remaining == 0 {
 			return chunk.Data, nil
 		}
-		// TODO lenght check and fail
+		// TODO length check and fail
 		*bufp = make([]byte, 0, len(chunk.Data)+int(chunk.Remaining))
 		*bufp = append(*bufp, chunk.Data...)
 	} else {

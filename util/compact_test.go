@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 type compactInt struct {
 	elements []int
 }

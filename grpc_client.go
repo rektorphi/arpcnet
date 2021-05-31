@@ -9,13 +9,16 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+// GRPCClient is an RPC exit module of a Node that relays RPCs as gRPC calls to an actual gRPC server.
 type GRPCClient struct {
 	conn           *grpc.ClientConn
 	route          *rpc.MultiRPCHandler
 	mountPrefixLen int
 }
 
-// Takes the last part of a call destination address as grpc fullMethodName
+// NewGRPCClient creates a new instance of a GRPCClient and associates it with the given core.
+// The mountPrefixLen parameter is used to split the actual gRPC full method name from the AprcNet address
+// and must be set to the length of address where this route handler is mounted at the core.
 func NewGRPCClient(core *rpc.Core, mountPrefixLen int, target string, insecure bool) *GRPCClient {
 	var conn *grpc.ClientConn
 	var err error
@@ -32,11 +35,13 @@ func NewGRPCClient(core *rpc.Core, mountPrefixLen int, target string, insecure b
 	return gc
 }
 
+// Close terminates operation of this client.
 func (gc *GRPCClient) Close() {
 	gc.route.Close()
 	gc.conn.Close()
 }
 
+// Handler returns the rpc.Handler interface of this client instance for hooking it into a Core.
 func (gc *GRPCClient) Handler() rpc.Handler {
 	return gc.route
 }
