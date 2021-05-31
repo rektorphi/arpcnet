@@ -1,4 +1,4 @@
-# ArpcNet [![Go](https://github.com/rektorphi/arpcnet/actions/workflows/go.yml/badge.svg)](https://github.com/rektorphi/arpcnet/actions/workflows/go.yml)[![Go Report Card](https://goreportcard.com/badge/rektorphi/arpcnet)](https://goreportcard.com/report/rektorphi/arpcnet) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/rektorphi/arpcnet/blob/main/LICENSE)
+# ArpcNet [![Go](https://github.com/rektorphi/arpcnet/actions/workflows/go.yml/badge.svg)](https://github.com/rektorphi/arpcnet/actions/workflows/go.yml) [![Go Report Card](https://goreportcard.com/badge/rektorphi/arpcnet)](https://goreportcard.com/report/rektorphi/arpcnet) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/rektorphi/arpcnet/blob/main/LICENSE)
 An RPC network based on hierachical groups of nodes written in Go.
 The network routes and transports remote procedure calls across a network of linked nodes and can potentially support different entry and exit protocols. However, currently only gRPC is supported.
 
