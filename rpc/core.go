@@ -17,17 +17,34 @@ const ( // iota is reset to 0
 	LDetail = iota // Also log query-announce and rpc protocol events.
 )
 
+// LogLevel changes the amount of logged messages. It only applies when cores are being created.
 var LogLevel int = LInfo
 
 var addrLocal = *NewAddress("local")
 
+// AddrLocal returns a static address prefix representing local addresses. This prefix will be substituted with the address of the local group.
 func AddrLocal() *Address {
 	return &addrLocal
 }
 
-// TODO consider optimizing thread sync. there are also mutexes in manager and router, maybe 'm' is redundant, or the others are.
-// But the slow query requires a short mutex and the router but should not block the whole core.
+// RoutingError is an error issued when an RPC cannot start because no route to its destination could be found.
+type RoutingError struct {
+	Dest  *Address
+	Cause error
+}
+
+func (e RoutingError) Error() string {
+	if e.Cause == nil {
+		return fmt.Sprintf("no route available to destination '%s'", e.Dest.String())
+	}
+	return fmt.Sprintf("no route available to destination '%s', cause: %v", e.Dest.String(), e.Cause)
+}
+
+// Core is a central component of an Arpc network node.
+// It is responsible for holding all active RPCs, all active routes, dispatching messages and resolving routes for new RPCs.
 type Core struct {
+	// TODO consider optimizing thread sync. there are also mutexes in manager and router, maybe 'm' is redundant, or the others are.
+	// But the slow query requires a short mutex and the router but should not block the whole core.
 	Manager
 	group  *Address
 	id     *Address
@@ -43,27 +60,32 @@ func (c *Core) Group() *Address {
 	return c.group
 }
 
-// ID is a unique identifier for this core in the group. To obtain the full ID, append the id to the group.
+// ID is a unique identifier for this core. It includes the group ID as a prefix.
 func (c *Core) ID() *Address {
 	return c.id
 }
 
+// Router returns the routing module of the core.
 func (c *Core) Router() Router {
 	return c.router
 }
 
+// MemMan returns the memory management module of the core.
 func (c *Core) MemMan() MemoryManager {
 	return c.memMan
 }
 
+// Quanda returns the query and announce module of the core.
 func (c *Core) Quanda() *Quanda {
 	return c.quanda
 }
 
+// Log returns the logger of the core. All log messages specific to a core should use this logger so logs from different cores can be distinguished in tests.
 func (c *Core) Log() util.Logger {
 	return c.log
 }
 
+// NewCoreExt creates a new core instance with given parameters. Provides more parameterization options than NewCore.
 func NewCoreExt(group *Address, maxMemory int, coreID string) (core *Core) {
 	var mm MemoryManager
 	if maxMemory <= 0 {
@@ -105,15 +127,17 @@ func NewCoreExt(group *Address, maxMemory int, coreID string) (core *Core) {
 	return
 }
 
+// NewCore creates a new core instance with a random core identifier suffix. This is recommended for general use.
 func NewCore(group *Address, maxMemory int) *Core {
 	return NewCoreExt(group, maxMemory, "")
 }
 
-func (rc *Core) Stop() {
-	rc.quanda.Stop()
+// Stop terminates operation of this core.
+func (c *Core) Stop() {
+	c.quanda.Stop()
 }
 
-func (rc *Core) frameLogger(rpc *RPC, frame Frame) {
+func (c *Core) frameLogger(rpc *RPC, frame Frame) {
 	switch frame.Type() {
 	case UpStart:
 		rpc.log.Printf("Start")
@@ -130,105 +154,99 @@ func (rc *Core) frameLogger(rpc *RPC, frame Frame) {
 	}
 }
 
-func (rc *Core) destLogger(e *DestinationEvent) {
+func (c *Core) destLogger(e *DestinationEvent) {
 	if e.Metric.Hops >= 0 {
-		rc.log.Printf("Online %s via %s (%s)", e.Dest.String(), e.Route.String(), e.Metric.String())
-		go rc.quanda.handleDestOnline(e.Dest, e.Route.(Handler), e.Metric)
+		c.log.Printf("Online %s via %s (%s)", e.Dest.String(), e.Route.String(), e.Metric.String())
+		go c.quanda.handleDestOnline(e.Dest, e.Route.(Handler), e.Metric)
 	} else {
-		rc.log.Printf("Offline %s via %s (%s)", e.Dest.String(), e.Route.String(), e.Metric.String())
-		go rc.quanda.handleDestOffline(e.Dest, e.Route.(Handler))
+		c.log.Printf("Offline %s via %s (%s)", e.Dest.String(), e.Route.String(), e.Metric.String())
+		go c.quanda.handleDestOffline(e.Dest, e.Route.(Handler))
 	}
 }
 
-type RoutingError struct {
-	Dest  *Address
-	Cause error
-}
-
-func (e RoutingError) Error() string {
-	if e.Cause == nil {
-		return fmt.Sprintf("no route available to destination '%s'", e.Dest.String())
-	}
-	return fmt.Sprintf("no route available to destination '%s', cause: %v", e.Dest.String(), e.Cause)
-}
-
-func (rc *Core) initRPCLogger(rpc *RPC) {
+func (c *Core) initRPCLogger(rpc *RPC) {
 	if LogLevel >= LDetail {
-		rpc.log = rc.log.WithPrefix("RPC " + rpc.fullID.String() + " ")
+		rpc.log = c.log.WithPrefix("RPC " + rpc.fullID.String() + " ")
 	}
 }
 
-func (rc *Core) resolveAddress(dest *Address) *Address {
+func (c *Core) resolveAddress(dest *Address) *Address {
 	if dest.Len() == 0 {
 		return BlankAddress
 	}
 	if dest.StartsWith(&addrLocal) {
-		return rc.group.Append(dest.Slice(addrLocal.len, -1))
+		return c.group.Append(dest.Slice(addrLocal.len, -1))
 	}
 	return dest
 }
 
-func (rc *Core) RouteAndDispatch(ctx context.Context, frame Frame, downstreamHandler Handler) error {
+// RouteAndDispatch dispatches frames to their destination. If it is a start frame, a route to its destination is looked up and a local routing entry for the RPC is tracked.
+// Returns an error if no routing entry exists for the frame, if no route can be found to the destination of a start frame or if starting the RPC fails for other reasons.
+func (c *Core) RouteAndDispatch(ctx context.Context, frame Frame, downstreamHandler Handler) error {
 	// TODO this lock is temporary, needed because SetUpstreamHandler is not thread safe
-	rc.m.Lock()
-	defer rc.m.Unlock()
+	c.m.Lock()
+	defer c.m.Unlock()
 	if frame.Type() == UpStart {
 		var err error
 		start := frame.(UpStartFrame)
-		resolvedDest := rc.resolveAddress(start.Dest())
-		_, handler, err := rc.QueryRoute(ctx, resolvedDest, false)
+		resolvedDest := c.resolveAddress(start.Dest())
+		_, handler, err := c.QueryRoute(ctx, resolvedDest, false)
 		if err != nil {
 			return RoutingError{start.Dest(), err}
 		}
 
 		rpc := New(NewFullID(start.ID(), start.Source(), resolvedDest, []byte{}))
-		rc.initRPCLogger(rpc)
+		c.initRPCLogger(rpc)
 		rpc.SetUpstreamHandler(handler)
 		rpc.SetDownstreamHandler(downstreamHandler)
 
-		err = rc.Add(rpc)
+		err = c.Add(rpc)
 		if err != nil {
 			return err
 		}
 		lh, ok := downstreamHandler.(*LinkHandler)
 		if ok {
-			rc.quanda.onDestUsed(resolvedDest, lh, time.Now())
+			c.quanda.onDestUsed(resolvedDest, lh, time.Now())
 		}
 		return rpc.sendUpstream(ctx, frame)
 	}
-	return rc.Dispatch(ctx, frame, downstreamHandler.ID())
+	return c.Dispatch(ctx, frame, downstreamHandler.ID())
 }
 
-func (rc *Core) StartRPC(ctx context.Context, dest *Address, metadata []string, props map[string][]byte, downstreamHandler Handler) error {
-	resolvedDest := rc.resolveAddress(dest)
-	_, handler, err := rc.QueryRoute(ctx, resolvedDest, true)
+// StartRPC starts a new RPC from this core. A route to its destination is looked up and a local routing entry for the RPC is tracked.
+// Returns an error if no route can be found to the destination of a start frame or if starting the RPC fails for other reasons.
+func (c *Core) StartRPC(ctx context.Context, dest *Address, metadata []string, props map[string][]byte, downstreamHandler Handler) error {
+	resolvedDest := c.resolveAddress(dest)
+	_, handler, err := c.QueryRoute(ctx, resolvedDest, true)
 	if err != nil {
 		return RoutingError{dest, err}
 	}
 	// TODO this lock is temporary, needed because SetUpstreamHandler is not thread safe
-	rc.m.Lock()
-	defer rc.m.Unlock()
-	rpc := New(RandomFullID(rc.id, resolvedDest))
-	rc.initRPCLogger(rpc)
+	c.m.Lock()
+	defer c.m.Unlock()
+	rpc := New(RandomFullID(c.id, resolvedDest))
+	c.initRPCLogger(rpc)
 
 	// TODO could check here if the ID already exists locally at least
 	rpc.SetUpstreamHandler(handler)
 	rpc.SetDownstreamHandler(downstreamHandler)
-	err = rc.Add(rpc)
+	err = c.Add(rpc)
 	if err != nil {
 		return err
 	}
 	lh, ok := downstreamHandler.(*LinkHandler)
 	if ok {
-		rc.quanda.onDestUsed(resolvedDest, lh, time.Now())
+		c.quanda.onDestUsed(resolvedDest, lh, time.Now())
 	}
 	return rpc.sendUpstream(ctx, NewUpStartFrame(rpc.fullID, metadata, props))
 }
 
-// QueryRoute looks up a route by quering the network.
-// The ctx is only used for terminating the wait early, the query will remain active and collect results until the duration expires.
-func (rc *Core) QueryRoute(ctx context.Context, dest *Address, remoteQuery bool) (*Address, Handler, error) {
-	d, id, _ := rc.router.GetNearest(dest)
+// QueryRoute looks up a route by quering the network. It returns immediately if a route to the destination is already known at the core.
+// Otherwise a network query is run that blocks until it times out or a solution is found. The timeout can be shortened by setting one in the provided context.
+// If a route is found, returns the address for the found route, which may be a parent of the queried destination, and the route handler.
+// Otherwise returns an error.
+func (c *Core) QueryRoute(ctx context.Context, dest *Address, remoteQuery bool) (*Address, Handler, error) {
+	d, id, _ := c.router.GetNearest(dest)
 	handler, ok := id.(Handler)
 	if ok {
 		return dest.Slice(0, d), handler, nil
@@ -241,6 +259,6 @@ func (rc *Core) QueryRoute(ctx context.Context, dest *Address, remoteQuery bool)
 	if !ok || deadline.After(maxDeadline) {
 		deadline = maxDeadline
 	}
-	rq := rc.quanda.runQuery(dest, deadline, nil)
+	rq := c.quanda.runQuery(dest, deadline, nil)
 	return rq.await(ctx)
 }

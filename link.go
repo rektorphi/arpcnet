@@ -17,15 +17,24 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+// LinkTransport describes a bidirectional communication channel for LinkFrames to another Arpc node.
+type LinkTransport interface {
+	Send(*pb.LinkFrame) error
+	Recv() (*pb.LinkFrame, error)
+}
+
+// Link is a communication channel between a local core and a remote core.
+// RPC frames and routing queries are transported over this channel.
 type Link struct {
 	core      *rpc.Core
-	linkCall  LinkCall
+	transport LinkTransport
 	sendm     sync.Mutex
 	logString string
 }
 
-func NewLink(core *rpc.Core, linkCall LinkCall, logString string) (res *Link) {
-	res = &Link{core, linkCall, sync.Mutex{}, logString}
+// NewLink creates a new instance of a Link and associates it with the given local core.
+func NewLink(core *rpc.Core, linkt LinkTransport, logString string) (res *Link) {
+	res = &Link{core, linkt, sync.Mutex{}, logString}
 	return
 }
 
@@ -35,11 +44,13 @@ func (lr *Link) String() string {
 
 func (lr *Link) sendSafely(lf *pb.LinkFrame) (err error) {
 	lr.sendm.Lock()
-	err = lr.linkCall.Send(lf)
+	err = lr.transport.Send(lf)
 	lr.sendm.Unlock()
 	return
 }
 
+// ReceiveAndDispatch uses and blocks the calling goroutine to receive and dispatch messages comming in over the link transport.
+// The link is only established while this function is running. An error is returned when the link has failed.
 func (lr *Link) ReceiveAndDispatch() (err error) {
 tryAnotherId:
 	route := rpc.NewLinkHandler(0, lr.logString, lr.initRPC, lr.sendSafely)
@@ -48,7 +59,7 @@ tryAnotherId:
 	}
 	for {
 		var lf *pb.LinkFrame
-		lf, err = lr.linkCall.Recv()
+		lf, err = lr.transport.Recv()
 		if err != nil {
 			break
 		}
@@ -102,6 +113,7 @@ func (lr *Link) initRPC(rrpc *rpc.RPC, rcv rpc.FrameReceiver, snd rpc.FrameSende
 	}()
 }
 
+// LinkClient is used to establish a link between this node and a remote node with a running LinkServer.
 type LinkClient struct {
 	id         uint64
 	infoString string
@@ -115,6 +127,7 @@ func (lc *LinkClient) String() string {
 	return lc.infoString
 }
 
+// NewLinkClient creates a new LinkClient instance and associates it with the given rpc.Core.
 func NewLinkClient(conn *grpc.ClientConn, core *rpc.Core) (res *LinkClient) {
 	istr := fmt.Sprintf("LinkClient %s", conn.Target())
 	res = &LinkClient{rand.Uint64(), istr, conn, core, 0, core.Log().WithPrefix(istr + " ")}
@@ -127,38 +140,34 @@ func (lc *LinkClient) Close() {
 	lc.conn.Close()
 }
 
-func (lc *LinkClient) Start() {
+// Run uses and blocks the calling goroutine to establish the link and to receive and dispatch incomming messages to the core.
+// Until Close is called, it will continously block retry with a delay to establish the connection.
+func (lc *LinkClient) Run() {
 	client := pb.NewLinkServiceClient(lc.conn)
-	go func() {
-		for atomic.LoadInt32(&lc.isClosed) == 0 {
-			var linkRoute *Link
-			call, err := client.Link(context.Background())
-			if err != nil {
-				goto handleError
-			}
-			lc.log.Printf("opened")
-			linkRoute = NewLink(lc.core, call, lc.infoString)
-			err = linkRoute.ReceiveAndDispatch()
-			if err != nil {
-				goto handleError
-			}
-			continue
-		handleError:
-			if atomic.LoadInt32(&lc.isClosed) != 0 {
-				break
-			}
-			lc.log.Printf("failed: %s, retrying...\n", err.Error())
-			time.Sleep(5000 * time.Millisecond)
+	for atomic.LoadInt32(&lc.isClosed) == 0 {
+		var linkRoute *Link
+		call, err := client.Link(context.Background())
+		if err != nil {
+			goto handleError
 		}
-		lc.log.Printf("closed")
-	}()
+		lc.log.Printf("opened")
+		linkRoute = NewLink(lc.core, call, lc.infoString)
+		err = linkRoute.ReceiveAndDispatch()
+		if err != nil {
+			goto handleError
+		}
+		continue
+	handleError:
+		if atomic.LoadInt32(&lc.isClosed) != 0 {
+			break
+		}
+		lc.log.Printf("failed: %s, retrying...\n", err.Error())
+		time.Sleep(5000 * time.Millisecond)
+	}
+	lc.log.Printf("closed")
 }
 
-type LinkCall interface {
-	Send(*pb.LinkFrame) error
-	Recv() (*pb.LinkFrame, error)
-}
-
+// LinkServer is used to establish a links between this node and remote nodes with a LinkClients.
 type LinkServer struct {
 	pb.UnimplementedLinkServiceServer
 	listen     net.Listener
@@ -166,21 +175,26 @@ type LinkServer struct {
 	infoString string
 }
 
+// NewLinkServer creates a new instance of a LinkServer.
 func NewLinkServer(listen net.Listener, core *rpc.Core) *LinkServer {
 	istr := fmt.Sprintf("LinkServer %s", listen.Addr().String())
 	return &LinkServer{listen: listen, core: core, infoString: istr}
 }
 
-func (ls *LinkServer) Start() {
+// Run blocks the calling goroutine to operate the server and handle incomming connections.
+// The call ends when Stop is called.
+func (ls *LinkServer) Run() {
 	grpcServer := grpc.NewServer()
 	pb.RegisterLinkServiceServer(grpcServer, ls)
-	go grpcServer.Serve(ls.listen)
+	grpcServer.Serve(ls.listen)
 }
 
+// Stop closes the server and terminates all open links.
 func (ls *LinkServer) Stop() {
 	ls.listen.Close()
 }
 
+// Link implements v1.LinkServiceServer.Link.
 func (ls *LinkServer) Link(call pb.LinkService_LinkServer) error {
 	var linkString string
 	p, ok := peer.FromContext(call.Context())

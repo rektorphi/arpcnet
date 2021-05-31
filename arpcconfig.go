@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Config represents all parameters to initialize a Node.
 type Config struct {
 	Group      string `yaml:"group"`
 	GRPCPort   int    `yaml:"grpcPort"`
@@ -24,6 +25,7 @@ type Config struct {
 	LinkClients []LinkClientConfig `yaml:"linkClients"`
 }
 
+// GRPCMapping configures one registration of a gRPC service at a node to map the service into the ArpcNet namespace.
 type GRPCMapping struct {
 	Target string `yaml:"target"`
 	Mount  string `yaml:"mount,omitempty"`
@@ -31,15 +33,18 @@ type GRPCMapping struct {
 	Methods []string `yaml:"methods,omitempty"`
 }
 
+// LinkClientConfig configures a link connection from one node to another node that must have a link server.
 type LinkClientConfig struct {
 	Target   string `yaml:"target"`
 	Insecure bool   `yaml:"insecure"`
 }
 
+// LinkServerConfig configures that a node can receive link client connections from other nodes.
 type LinkServerConfig struct {
 	Port int `yaml:"port"`
 }
 
+// ExampleConfig returns a static configuration with example values.
 func ExampleConfig() (res *Config) {
 	res = &Config{
 		Group:      "my:group",
@@ -57,6 +62,7 @@ func ExampleConfig() (res *Config) {
 	return
 }
 
+// LoadConfigfromFile loads a Config from file system.
 func LoadConfigfromFile(name string) (*Config, error) {
 	f, err := os.Open(name)
 	if err != nil {
@@ -66,6 +72,7 @@ func LoadConfigfromFile(name string) (*Config, error) {
 	return LoadConfig(f)
 }
 
+// LoadConfig loads a Config from a reader.
 func LoadConfig(r io.Reader) (*Config, error) {
 	var cfg Config
 	decoder := yaml.NewDecoder(r)
@@ -73,12 +80,14 @@ func LoadConfig(r io.Reader) (*Config, error) {
 	return &cfg, err
 }
 
+// WriteConfig writes a Config to a writer.
 func WriteConfig(w io.Writer, cfg *Config) error {
 	encoder := yaml.NewEncoder(w)
 	return encoder.Encode(&cfg)
 }
 
-func (cfg *Config) Apply(n *Node) error {
+// apply applies some configuration values from a Config to a Node.
+func (cfg *Config) apply(n *Node) error {
 	for i, serviceConfig := range cfg.GRPCMappings {
 		mountAddr, err := rpc.ParseAddress(serviceConfig.Mount)
 		if err != nil {
@@ -112,7 +121,7 @@ func (cfg *Config) Apply(n *Node) error {
 			return err
 		}
 		ls := NewLinkServer(listen, n.core)
-		ls.Start()
+		go ls.Run()
 		n.AddCloseable(func() { listen.Close() })
 	}
 	for _, lccfg := range cfg.LinkClients {
@@ -127,7 +136,7 @@ func (cfg *Config) Apply(n *Node) error {
 			return err
 		}
 		lc := NewLinkClient(conn, n.core)
-		lc.Start()
+		go lc.Run()
 		n.AddCloseable(func() { conn.Close() })
 	}
 	return nil

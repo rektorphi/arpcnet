@@ -18,8 +18,11 @@ import (
 
 var addrGrpc rpc.Address = *rpc.NewAddress("grpc")
 
+// GRPCAddrKey is the gRPC metadata key under which the destination ArpcNet address is stored.
 const GRPCAddrKey = "arpcnet-addr"
 
+// GRPCServer is a rpc.Core module for gRPCs entering the Arpc network.
+// Arbitrary gRPC calls can be handled by this gRPC server and are routed via an rpc.Core.
 type GRPCServer struct {
 	identity uint64
 	core     *rpc.Core
@@ -27,12 +30,14 @@ type GRPCServer struct {
 	server   *grpc.Server
 }
 
+// NewGRPCServer creates a new GRPCServer instance and associates it to the given rpc.Core.
 func NewGRPCServer(core *rpc.Core, port int) *GRPCServer {
 	res := &GRPCServer{rpc.RandHandlerID(), core, port, nil}
 	res.server = grpc.NewServer(grpc.CustomCodec(&rawCodec{}), grpc.UnknownServiceHandler(res.unknownServiceHandler))
 	return res
 }
 
+// Serve blocks and must be called to operate the gRPC server.
 func (gs *GRPCServer) Serve() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", gs.port))
 	if err != nil {
@@ -41,6 +46,7 @@ func (gs *GRPCServer) Serve() {
 	gs.server.Serve(lis)
 }
 
+// Stop terminates operation of the gRPC server.
 func (gs *GRPCServer) Stop() {
 	gs.server.Stop()
 }
@@ -74,7 +80,7 @@ func (c *rawCodec) String() string {
 	return "rawcodec"
 }
 
-func (gserv *GRPCServer) unknownServiceHandler(srv interface{}, serverStream grpc.ServerStream) error {
+func (gs *GRPCServer) unknownServiceHandler(srv interface{}, serverStream grpc.ServerStream) error {
 	md, ok := metadata.FromIncomingContext(serverStream.Context())
 	if !ok {
 		md = metadata.New(make(map[string]string))
@@ -103,8 +109,8 @@ func (gserv *GRPCServer) unknownServiceHandler(srv interface{}, serverStream grp
 	}
 
 	rpcCtx, ctxCancel := context.WithCancel(serverStream.Context())
-	ccall, clientHandler := rpc.NewClientCall(gserv.identity, remoteName, serverStream.Context(), gserv.core.MemMan())
-	err = gserv.core.StartRPC(rpcCtx, baseAddr.Append(&addrGrpc).Appends(methodParts...), []string{}, make(map[string][]byte), clientHandler)
+	ccall, clientHandler := rpc.NewClientCall(gs.identity, remoteName, serverStream.Context(), gs.core.MemMan())
+	err = gs.core.StartRPC(rpcCtx, baseAddr.Append(&addrGrpc).Appends(methodParts...), []string{}, make(map[string][]byte), clientHandler)
 	if err != nil {
 		ctxCancel()
 		return err
@@ -173,6 +179,7 @@ func (gserv *GRPCServer) unknownServiceHandler(srv interface{}, serverStream grp
 	return status.Errorf(codes.Internal, "should not get here")
 }
 
+// SplitFullMethodName splits the full name of a gRPC method, including proto package, service name and method name, into their individual name components.
 func SplitFullMethodName(fullMethodName string) ([]string, error) {
 	// First split off method name
 	var tokens []string
@@ -189,6 +196,8 @@ func SplitFullMethodName(fullMethodName string) ([]string, error) {
 	return packageParts, nil
 }
 
+// ToFullMethodName converts an rpc.Address into a gRPC full method name.
+// Note that this should be a suffix from a global ArpcNet address and thus the actual gRPC method part must be sliced off before using this function.
 func ToFullMethodName(addr *rpc.Address) string {
 	if addr.Len() == 0 {
 		return ""
