@@ -301,7 +301,7 @@ func (qa *Quanda) runQuery(dest *Address, deadline time.Time, linkHandler *LinkH
 			qa.querym.Lock()
 			if rq.doneErr == nil && rq.doneHandler == nil {
 				qa.log.Printf("Query for %s expired", dest.String())
-				rq.fail(fmt.Errorf("query timeout expired"))
+				rq.fail(fmt.Errorf("query deadline exceeded"))
 				qa.queries.Remove(dest)
 			}
 			qa.querym.Unlock()
