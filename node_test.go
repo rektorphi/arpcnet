@@ -99,7 +99,7 @@ func TestOneHopStreamCall(t *testing.T) {
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 5000*time.Millisecond)
 	defer cancelCtx()
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	ctx = metadata.AppendToOutgoingContext(ctx, GRPCAddrKey, "test:group")
 	err := testservice.TestStreamCall(ctx, setup.nodeClient, 128, 1000)
