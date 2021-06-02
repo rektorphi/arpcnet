@@ -15,13 +15,13 @@ import (
 	"github.com/rektorphi/arpcnet/rpc"
 )
 
-type mountFlags []string
+type stringsFlag []string
 
-func (mf mountFlags) String() string {
+func (mf stringsFlag) String() string {
 	return strings.Join(mf, ",")
 }
 
-func (mf *mountFlags) Set(value string) error {
+func (mf *stringsFlag) Set(value string) error {
 	*mf = append(*mf, value)
 	return nil
 }
@@ -35,9 +35,10 @@ func main() {
 	var verbose = flag.Bool("v", false, "Verbose logging")
 	var group = flag.String("g", "default-group", "Arpcnet group of the node")
 	var serverPort = flag.Int("gp", 8028, "Port for gRPC gateway server")
-	var link = flag.String("l", "", "Address of a server node to link to")
+	var links stringsFlag
+	flag.Var(&links, "l", "Address of a server node to link to")
 	var linkPort = flag.Int("lp", 8029, "Port for incomming links from other nodes")
-	var mounts mountFlags
+	var mounts stringsFlag
 	flag.Var(&mounts, "mg", "Map a gRPC server into the arpc network <host:port>=<arpc:name>")
 	flag.Parse()
 
@@ -57,8 +58,8 @@ func main() {
 	if len(*cfgFile) == 0 {
 		cfg = &arpcnet.Config{GRPCPort: *serverPort, CoreMemory: "", Group: *group}
 
-		if len(*link) != 0 {
-			cfg.LinkClients = []arpcnet.LinkClientConfig{{Target: *link, Insecure: true}}
+		for _, l := range links {
+			cfg.LinkClients = []arpcnet.LinkClientConfig{{Target: l, Insecure: true}}
 		}
 		if *linkPort > 0 {
 			cfg.LinkServers = []arpcnet.LinkServerConfig{{Port: *linkPort}}

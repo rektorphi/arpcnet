@@ -30,8 +30,6 @@ func (s *Setup) Close() {
 func NewSetup(coreMemory int) *Setup {
 	setup := &Setup{}
 	setup.stopTestServer = testservice.StartTestServer(40123)
-
-	setup.nodeClient, setup.stopClient = testservice.NewTestClient(fmt.Sprintf("localhost:%d", 44077))
 	var err error
 	setup.node, err = NewNode(&Config{
 		GRPCPort:   44077,
@@ -45,6 +43,7 @@ func NewSetup(coreMemory int) *Setup {
 		log.Fatalf("failed creating node %v", err)
 	}
 	go setup.node.Run()
+	setup.nodeClient, setup.stopClient = testservice.NewTestClient(fmt.Sprintf("localhost:%d", 44077))
 	return setup
 }
 
