@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // LinkTransport describes a bidirectional communication channel for LinkFrames to another Arpc node.
@@ -144,13 +146,13 @@ func (lc *LinkClient) Close() {
 // Until Close is called, it will continously block retry with a delay to establish the connection.
 func (lc *LinkClient) Run() {
 	client := pb.NewLinkServiceClient(lc.conn)
+	lc.log.Printf("opening")
 	for atomic.LoadInt32(&lc.isClosed) == 0 {
 		var linkRoute *Link
 		call, err := client.Link(context.Background())
 		if err != nil {
 			goto handleError
 		}
-		lc.log.Printf("opened")
 		linkRoute = NewLink(lc.core, call, lc.infoString)
 		err = linkRoute.ReceiveAndDispatch()
 		if err != nil {
@@ -161,8 +163,13 @@ func (lc *LinkClient) Run() {
 		if atomic.LoadInt32(&lc.isClosed) != 0 {
 			break
 		}
-		lc.log.Printf("failed: %s, retrying...\n", err.Error())
-		time.Sleep(5000 * time.Millisecond)
+		status := status.Convert(err)
+		if strings.Contains(status.Message(), "504") {
+			time.Sleep(100 * time.Millisecond)
+		} else {
+			lc.log.Printf("failed: %s, retrying...\n", err.Error())
+			time.Sleep(5000 * time.Millisecond)
+		}
 	}
 	lc.log.Printf("closed")
 }

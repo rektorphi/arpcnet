@@ -1,14 +1,17 @@
 package arpcnet
 
 import (
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 
 	"code.cloudfoundry.org/bytefmt"
 	"github.com/rektorphi/arpcnet/rpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"gopkg.in/yaml.v2"
 )
 
@@ -23,6 +26,8 @@ type Config struct {
 	LinkServers []LinkServerConfig `yaml:"linkServers"`
 
 	LinkClients []LinkClientConfig `yaml:"linkClients"`
+
+	ServerCertificates []string `yaml:"serverCertificates"`
 }
 
 // GRPCMapping configures one registration of a gRPC service at a node to map the service into the ArpcNet namespace.
@@ -58,6 +63,7 @@ func ExampleConfig() (res *Config) {
 			{Target: "localhost:11001", Mount: "my:services1"},
 			{Target: "localhost:11002", Methods: []string{"my/package/Service/MyMethod"}},
 		},
+		ServerCertificates: []string{"isrgrootx1.pem"},
 	}
 	return
 }
@@ -124,13 +130,24 @@ func (cfg *Config) apply(n *Node) error {
 		go ls.Run()
 		n.AddCloseable(func() { listen.Close() })
 	}
+	certPool := x509.NewCertPool()
+	for _, certFile := range cfg.ServerCertificates {
+		certFileData, err := ioutil.ReadFile(certFile)
+		if err != nil {
+			return fmt.Errorf("failed loading Server Certificate %s: %v", certFile, err)
+		}
+		ok := certPool.AppendCertsFromPEM(certFileData)
+		if !ok {
+			return fmt.Errorf("failed appending Server Certificate %s to pool", certFile)
+		}
+	}
 	for _, lccfg := range cfg.LinkClients {
 		var conn *grpc.ClientConn
 		var err error
 		if lccfg.Insecure {
 			conn, err = grpc.Dial(lccfg.Target, grpc.WithInsecure())
 		} else {
-			conn, err = grpc.Dial(lccfg.Target)
+			conn, err = grpc.Dial(lccfg.Target, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(certPool, "")))
 		}
 		if err != nil {
 			return err
