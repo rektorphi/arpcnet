@@ -53,7 +53,7 @@ func main() {
 		return
 	}
 
-	log.Printf("ArpcNet version %s\n", arpcnet.Version)
+	log.Printf("ArpcNet version %s\n", arpcnet.Version())
 	var cfg *arpcnet.Config
 	if len(*cfgFile) == 0 {
 		cfg = &arpcnet.Config{GRPCPort: *serverPort, CoreMemory: "", Group: *group}
